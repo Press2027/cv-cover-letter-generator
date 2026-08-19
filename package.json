@@ -1,5 +1,5 @@
 {
-  "name": "Pressmash-cv-cover-letter-generator",
+  "name": "pressmash-cv-cover-letter-generator",
   "private": true,
   "version": "1.0.0",
   "type": "module",
@@ -9,6 +9,6 @@
     "preview": "vite preview"
   },
   "devDependencies": {
-    "vite": "^7.0.0"
+    "vite": "^7.1.3"
   }
 }
