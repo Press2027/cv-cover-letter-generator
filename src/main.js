@@ -1,4 +1,9 @@
 import "./style.css";
+import * as pdfjsLib from "pdfjs-dist";
+import mammoth from "mammoth";
+
+pdfjsLib.GlobalWorkerOptions.workerSrc =
+  `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.5.136/pdf.worker.min.mjs`;
 
 const STORAGE_KEY = "pressmashData";
 
@@ -1894,6 +1899,178 @@ document.querySelector("#copyBtn").onclick =
       );
     }
   };
+
+  async function readPDF(file) {
+
+  const buffer = await file.arrayBuffer();
+
+  const pdf =
+    await pdfjsLib.getDocument({
+      data: buffer
+    }).promise;
+
+  let text = "";
+
+  for (let page = 1; page <= pdf.numPages; page++) {
+
+    const current =
+      await pdf.getPage(page);
+
+    const content =
+      await current.getTextContent();
+
+    text +=
+      content.items
+        .map(item => item.str)
+        .join(" ") + "\n";
+  }
+
+  return text;
+}
+
+
+async function readDOCX(file) {
+
+  const buffer = await file.arrayBuffer();
+
+  const result =
+    await mammoth.extractRawText({
+      arrayBuffer: buffer
+    });
+
+  return result.value;
+}
+document
+  .querySelector("#cvUpload")
+  .addEventListener("change", async (event) => {
+
+    const file = event.target.files[0];
+
+    if (!file) return;
+
+    let text = "";
+
+    try {
+
+      if (file.name.endsWith(".pdf")) {
+        text = await readPDF(file);
+      }
+
+      else if (file.name.endsWith(".docx")) {
+        text = await readDOCX(file);
+      }
+
+      parseImportedCV(text);
+
+      toast("CV imported successfully.");
+
+    }
+
+    catch (error) {
+
+      console.error(error);
+
+      toast("Unable to read the file.");
+    }
+
+  });
+
+  function parseImportedCV(text) {
+
+  const email =
+    text.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i);
+
+  const phone =
+    text.match(/\+?\d[\d\s-]{7,}/);
+
+  const lines =
+    text.split("\n").filter(Boolean);
+
+  data.personal.name =
+    lines[0] || data.personal.name;
+
+  data.personal.email =
+    email?.[0] || data.personal.email;
+
+  data.personal.phone =
+    phone?.[0] || data.personal.phone;
+
+  data.summary =
+    text.substring(0, 350);
+
+  save(false);
+
+  render();
+}
+
+document
+  .querySelector("#improveCvBtn")
+  .onclick = async () => {
+
+    toast("Improving your CV...");
+
+    const prompt = `
+Rewrite this CV professionally.
+
+Requirements:
+
+- ATS-friendly
+- Strong professional summary
+- Action-oriented experience bullets
+- Better skills section
+- Modern wording
+
+CV:
+
+${JSON.stringify(data)}
+`;
+
+    try {
+
+      const response =
+        await fetch("/api/improve-cv", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json"
+          },
+          body: JSON.stringify({ prompt })
+        });
+
+      const result =
+        await response.json();
+
+      applyImprovedCV(result);
+
+      toast("Professional version created.");
+
+    }
+
+    catch {
+
+      toast("AI server unavailable.");
+    }
+
+  };
+
+  function applyImprovedCV(result) {
+
+  data.summary =
+    result.summary || data.summary;
+
+  data.skills =
+    result.skills || data.skills;
+
+  data.experience =
+    result.experience || data.experience;
+
+  data.cover.jobDescription =
+    result.coverLetter || data.cover.jobDescription;
+
+  save(false);
+
+  render();
+}
+
 
 /* =========================================================
    PRESSMASH FOOTER
